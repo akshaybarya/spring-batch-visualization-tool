@@ -8,7 +8,7 @@ function App() {
   const [config, setConfig] = useState({
     totalItems: 1000,
     usePartitioner: false,
-    gridSize: 4,
+    gridSize: 250,
     parallelPartitions: 2,
     chunkSize: 100,
     parallelProcessors: 1,
@@ -102,7 +102,7 @@ function App() {
             {config.usePartitioner && (
               <>
                 <div className="form-group">
-                  <label htmlFor="gridSize">Grid Size</label>
+                  <label htmlFor="gridSize">Grid Size (Items per Partition)</label>
                   <input
                     type="number"
                     id="gridSize"
@@ -111,7 +111,7 @@ function App() {
                     onChange={handleInputChange}
                     min="1"
                   />
-                  <span className="help-text">Number of partitions to create</span>
+                  <span className="help-text">Number of items in each partition</span>
                 </div>
 
                 <div className="form-group">

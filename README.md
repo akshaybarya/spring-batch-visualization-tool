@@ -43,7 +43,7 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 ### Partitioner Settings
 
 1. **Enable Partitioner**: Toggle to enable/disable partitioning
-2. **Grid Size**: Number of partitions to create
+2. **Grid Size**: Number of items per partition (partitions are created dynamically based on total items)
 3. **Parallel Partitions**: Number of partitions to run simultaneously
 
 ### Step Processing Settings
@@ -91,7 +91,7 @@ Detailed chronological log of all events including:
 ### Scenario 2: Partitioned Job
 - Total Items: 10000
 - Enable Partitioner: Yes
-- Grid Size: 4
+- Grid Size: 2500 (creates 4 partitions of 2500 items each)
 - Parallel Partitions: 2
 - Chunk Size: 100
 - Parallel Processors: 2
@@ -126,13 +126,63 @@ This project is configured for easy deployment to GitHub Pages.
 ### Prerequisites
 
 1. Create a GitHub repository named `spring-batch-visualization-tool`
-2. Push your code to the repository
+2. Ensure you have SSH keys set up for your GitHub account
+3. Configure Git to use the correct SSH key (see below)
 
-### Deploy Steps
+### 🔑 Using Personal GitHub Account (Multiple Account Setup)
 
-1. **Build and Deploy**:
+If you have multiple GitHub accounts (e.g., personal and work), you need to ensure Git uses the correct SSH key for this repository.
+
+#### Initial Setup
+
+1. **Configure repository to use personal SSH key**:
    ```bash
-   npm run deploy
+   git config core.sshCommand "ssh -i ~/.ssh/your-personal-key -o IdentitiesOnly=yes"
+   ```
+   Replace `your-personal-key` with your actual SSH key filename (e.g., `akshaybarya`, `id_rsa`, etc.)
+
+2. **Verify SSH authentication**:
+   ```bash
+   ssh -i ~/.ssh/your-personal-key -T git@github.com
+   ```
+   You should see: `Hi your-username! You've successfully authenticated...`
+
+#### SSH Config Method (Recommended)
+
+Alternatively, set up SSH config for cleaner commands:
+
+1. Edit `~/.ssh/config`:
+   ```
+   # Personal GitHub account
+   Host github.com-personal
+       HostName github.com
+       User git
+       IdentityFile ~/.ssh/your-personal-key
+       IdentitiesOnly yes
+   ```
+
+2. Update remote URL:
+   ```bash
+   git remote set-url origin git@github.com-personal:username/spring-batch-visualization-tool.git
+   ```
+
+### 📤 Pushing Code to GitHub
+
+**Option 1: Using environment variable (if you have multiple accounts)**
+```bash
+GIT_SSH_COMMAND="ssh -i ~/.ssh/your-personal-key -o IdentitiesOnly=yes" git push -u origin main
+```
+
+**Option 2: Standard push (if SSH config is set up)**
+```bash
+git push -u origin main
+```
+
+### 🚀 Deploy Steps
+
+1. **First-time deployment with personal account**:
+   ```bash
+   GIT_SSH_COMMAND="ssh -i ~/.ssh/your-personal-key -o IdentitiesOnly=yes" npm run deploy
    ```
 
    This command will:
@@ -144,13 +194,64 @@ This project is configured for easy deployment to GitHub Pages.
    - Go to your repository on GitHub
    - Navigate to Settings → Pages
    - Source should be set to `gh-pages` branch (this is done automatically by the deploy script)
-   - Your site will be published at: `https://akshaybarya.github.io/spring-batch-visualization-tool`
+   - Your site will be published at: `https://username.github.io/spring-batch-visualization-tool`
 
 3. **Subsequent Deployments**:
    ```bash
+   # With personal SSH key
+   GIT_SSH_COMMAND="ssh -i ~/.ssh/your-personal-key -o IdentitiesOnly=yes" npm run deploy
+   
+   # Or if SSH config is set up
    npm run deploy
    ```
-   Just run this command whenever you want to update the live site.
+
+### 🔧 Troubleshooting
+
+#### Permission Denied Error
+
+If you see:
+```
+ERROR: Permission to username/repo.git denied to wrong-account
+```
+
+**Solution**: You're using the wrong SSH key. Use the `GIT_SSH_COMMAND` method:
+```bash
+GIT_SSH_COMMAND="ssh -i ~/.ssh/correct-key -o IdentitiesOnly=yes" npm run deploy
+```
+
+#### Branch Already Exists Error
+
+If deployment fails with `branch 'gh-pages' already exists`:
+
+```bash
+# Clean the gh-pages cache
+npx gh-pages-clean
+
+# Or manually remove cache
+rm -rf node_modules/.cache
+
+# Then deploy again
+GIT_SSH_COMMAND="ssh -i ~/.ssh/your-key -o IdentitiesOnly=yes" npm run deploy
+```
+
+### 📝 Quick Reference Commands
+
+```bash
+# Check which SSH key Git is using
+git config core.sshCommand
+
+# Test SSH connection
+ssh -i ~/.ssh/your-key -T git@github.com
+
+# Push code with specific SSH key
+GIT_SSH_COMMAND="ssh -i ~/.ssh/your-key -o IdentitiesOnly=yes" git push
+
+# Deploy with specific SSH key
+GIT_SSH_COMMAND="ssh -i ~/.ssh/your-key -o IdentitiesOnly=yes" npm run deploy
+
+# Clean gh-pages cache
+npx gh-pages-clean
+```
 
 ### Manual Deployment Steps
 
@@ -160,8 +261,8 @@ If you prefer manual deployment:
 # 1. Build the project
 npm run build
 
-# 2. Deploy to gh-pages branch
-npx gh-pages -d build
+# 2. Deploy to gh-pages branch (with personal SSH key)
+GIT_SSH_COMMAND="ssh -i ~/.ssh/your-key -o IdentitiesOnly=yes" npx gh-pages -d build
 ```
 
 ## License

@@ -22,10 +22,11 @@ export class SpringBatchSimulator {
   }
 
   simulateWithPartitioner(timeline, startTime) {
-    const itemsPerPartition = Math.ceil(this.totalItems / this.gridSize);
+    const itemsPerPartition = this.gridSize;
+    const numberOfPartitions = Math.ceil(this.totalItems / itemsPerPartition);
     const partitions = [];
     
-    for (let i = 0; i < this.gridSize; i++) {
+    for (let i = 0; i < numberOfPartitions; i++) {
       const startItem = i * itemsPerPartition;
       const endItem = Math.min(startItem + itemsPerPartition, this.totalItems);
       const itemCount = endItem - startItem;
