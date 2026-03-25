@@ -8,17 +8,120 @@ export class SpringBatchSimulator {
     this.parallelProcessors = config.parallelProcessors;
     this.readTime = config.readTime;
     this.processTime = config.processTime;
+    this.enableResourceValidation = config.enableResourceValidation;
+    this.podCores = config.podCores;
+    this.podThreads = config.podThreads;
+    this.hikariPoolSize = config.hikariPoolSize;
+    this.hikariMaxPoolSize = config.hikariMaxPoolSize;
   }
 
   simulate() {
     const timeline = [];
     let currentTime = 0;
     
+    let result;
     if (this.usePartitioner) {
-      return this.simulateWithPartitioner(timeline, currentTime);
+      result = this.simulateWithPartitioner(timeline, currentTime);
     } else {
-      return this.simulateWithoutPartitioner(timeline, currentTime);
+      result = this.simulateWithoutPartitioner(timeline, currentTime);
     }
+    
+    if (this.enableResourceValidation) {
+      result.resourceValidation = this.validateResources();
+    } else {
+      result.resourceValidation = null;
+    }
+    
+    return result;
+  }
+
+  validateResources() {
+    const warnings = [];
+    const suggestions = [];
+    
+    const maxConcurrentThreads = this.usePartitioner 
+      ? this.parallelPartitions * this.parallelProcessors
+      : this.parallelProcessors;
+    
+    const maxConcurrentDbConnections = this.usePartitioner
+      ? this.parallelPartitions * this.parallelProcessors
+      : this.parallelProcessors;
+    
+    if (maxConcurrentThreads > this.podThreads) {
+      warnings.push({
+        type: 'thread_overflow',
+        severity: 'error',
+        message: `Configuration requires ${maxConcurrentThreads} threads but POD only has ${this.podThreads} threads available`,
+        impact: 'Job will be throttled and may fail due to thread exhaustion',
+        recommendation: `Reduce parallel partitions (${this.parallelPartitions}) or parallel processors (${this.parallelProcessors}), or increase POD threads to at least ${maxConcurrentThreads}`
+      });
+    }
+    
+    if (maxConcurrentDbConnections > this.hikariMaxPoolSize) {
+      warnings.push({
+        type: 'db_pool_overflow',
+        severity: 'error',
+        message: `Configuration requires ${maxConcurrentDbConnections} DB connections but Hikari max pool size is only ${this.hikariMaxPoolSize}`,
+        impact: 'Database connection pool exhaustion will cause blocking and performance degradation',
+        recommendation: `Increase Hikari max pool size to at least ${maxConcurrentDbConnections} or reduce parallelism`
+      });
+    }
+    
+    const threadUtilization = (maxConcurrentThreads / this.podThreads) * 100;
+    if (threadUtilization < 50) {
+      suggestions.push({
+        type: 'thread_underutilization',
+        severity: 'info',
+        message: `Thread utilization is only ${threadUtilization.toFixed(1)}% (${maxConcurrentThreads}/${this.podThreads} threads)`,
+        impact: 'Resources are underutilized, job could run faster',
+        recommendation: `Consider increasing parallel partitions or parallel processors to utilize more threads. You can safely use up to ${this.podThreads} threads.`
+      });
+    }
+    
+    const dbUtilization = (maxConcurrentDbConnections / this.hikariMaxPoolSize) * 100;
+    if (dbUtilization < 50 && maxConcurrentDbConnections < this.hikariMaxPoolSize) {
+      suggestions.push({
+        type: 'db_underutilization',
+        severity: 'info',
+        message: `DB connection utilization is only ${dbUtilization.toFixed(1)}% (${maxConcurrentDbConnections}/${this.hikariMaxPoolSize} connections)`,
+        impact: 'Database connection pool is underutilized',
+        recommendation: `You can increase parallelism to utilize more DB connections (up to ${this.hikariMaxPoolSize}) for better performance.`
+      });
+    }
+    
+    const coreUtilization = (maxConcurrentThreads / (this.podCores * 4)) * 100;
+    if (coreUtilization > 100) {
+      warnings.push({
+        type: 'cpu_oversubscription',
+        severity: 'warning',
+        message: `Thread count (${maxConcurrentThreads}) exceeds optimal CPU capacity (${this.podCores} cores × 4 = ${this.podCores * 4} threads)`,
+        impact: 'CPU oversubscription may lead to context switching overhead and reduced performance',
+        recommendation: `Consider reducing parallelism or increasing POD CPU cores. Optimal thread count for Spring Batch is typically 4× CPU cores.`
+      });
+    }
+    
+    return {
+      isValid: warnings.length === 0,
+      warnings,
+      suggestions,
+      resourceUsage: {
+        threads: {
+          required: maxConcurrentThreads,
+          available: this.podThreads,
+          utilization: threadUtilization
+        },
+        dbConnections: {
+          required: maxConcurrentDbConnections,
+          available: this.hikariMaxPoolSize,
+          utilization: dbUtilization
+        },
+        cpuCores: {
+          available: this.podCores,
+          optimalThreads: this.podCores * 4,
+          utilization: coreUtilization
+        }
+      }
+    };
   }
 
   simulateWithPartitioner(timeline, startTime) {

@@ -3,6 +3,7 @@ import './App.css';
 import { SpringBatchSimulator } from './components/SpringBatchSimulator';
 import TimelineVisualization from './components/TimelineVisualization';
 import PerformanceMetrics from './components/PerformanceMetrics';
+import ResourceValidation from './components/ResourceValidation';
 
 function App() {
   const [config, setConfig] = useState({
@@ -13,7 +14,12 @@ function App() {
     chunkSize: 100,
     parallelProcessors: 1,
     readTime: 1,
-    processTime: 2
+    processTime: 2,
+    enableResourceValidation: false,
+    podCores: 4,
+    podThreads: 16,
+    hikariPoolSize: 10,
+    hikariMaxPoolSize: 20
   });
 
   const [simulationResult, setSimulationResult] = useState(null);
@@ -160,6 +166,78 @@ function App() {
             </div>
           </div>
 
+          <div className="config-section">
+            <h3>Infrastructure Settings</h3>
+            <div className="form-group checkbox-group">
+              <label>
+                <input
+                  type="checkbox"
+                  name="enableResourceValidation"
+                  checked={config.enableResourceValidation}
+                  onChange={handleInputChange}
+                />
+                <span>Enable Resource Validation</span>
+              </label>
+              <span className="help-text" style={{ marginLeft: '30px', display: 'block', marginTop: '5px' }}>Validate job configuration against POD and DB infrastructure limits</span>
+            </div>
+
+            {config.enableResourceValidation && (
+              <>
+            <div className="form-group">
+              <label htmlFor="podCores">POD CPU Cores</label>
+              <input
+                type="number"
+                id="podCores"
+                name="podCores"
+                value={config.podCores}
+                onChange={handleInputChange}
+                min="1"
+              />
+              <span className="help-text">Number of CPU cores available in the POD</span>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="podThreads">POD Max Threads</label>
+              <input
+                type="number"
+                id="podThreads"
+                name="podThreads"
+                value={config.podThreads}
+                onChange={handleInputChange}
+                min="1"
+              />
+              <span className="help-text">Maximum threads available in the POD</span>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="hikariPoolSize">Hikari Min Pool Size</label>
+              <input
+                type="number"
+                id="hikariPoolSize"
+                name="hikariPoolSize"
+                value={config.hikariPoolSize}
+                onChange={handleInputChange}
+                min="1"
+              />
+              <span className="help-text">Minimum DB connections in Hikari pool</span>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="hikariMaxPoolSize">Hikari Max Pool Size</label>
+              <input
+                type="number"
+                id="hikariMaxPoolSize"
+                name="hikariMaxPoolSize"
+                value={config.hikariMaxPoolSize}
+                onChange={handleInputChange}
+                min="1"
+              />
+              <span className="help-text">Maximum DB connections in Hikari pool</span>
+            </div>
+              </>
+            )}
+          </div>
+
           <button className="simulate-button" onClick={runSimulation}>
             ▶️ Run Simulation
           </button>
@@ -167,6 +245,7 @@ function App() {
 
         {simulationResult && (
           <div className="results-panel">
+            <ResourceValidation validation={simulationResult.resourceValidation} />
             <PerformanceMetrics simulationResult={simulationResult} />
             <TimelineVisualization simulationResult={simulationResult} />
           </div>
