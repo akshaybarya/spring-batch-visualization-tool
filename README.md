@@ -1,70 +1,124 @@
-# Getting Started with Create React App
+# 🚀 Spring Batch Performance Visualizer
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+An interactive web application to simulate and visualize Spring Batch job execution with partitioning and parallel processing capabilities.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Job Configuration**: Configure total items, read/process times
+- **Partitioner Support**: Enable partitioning with configurable grid size and parallel partitions
+- **Parallel Processing**: Configure chunk size and number of parallel processors
+- **Timeline Visualization**: Visual representation of job execution with step and chunk details
+- **Performance Metrics**: Comprehensive metrics including throughput, efficiency, and execution times
+- **Event Log**: Detailed log of all job events with timestamps
 
-### `npm start`
+## Getting Started
 
-Runs the app in the development mode.\
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm or yarn
+
+### Installation
+
+```bash
+npm install
+```
+
+### Running the Application
+
+```bash
+npm start
+```
+
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## How to Use
 
-### `npm test`
+### Basic Configuration
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1. **Total Items**: Set the total number of items to process
+2. **Read Time**: Time (in ms) to read each item
+3. **Process Time**: Time (in ms) to process each item
 
-### `npm run build`
+### Partitioner Settings
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. **Enable Partitioner**: Toggle to enable/disable partitioning
+2. **Grid Size**: Number of partitions to create
+3. **Parallel Partitions**: Number of partitions to run simultaneously
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Step Processing Settings
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. **Chunk Size**: Number of items per chunk
+2. **Parallel Processors**: Number of chunks to process in parallel
 
-### `npm run eject`
+### Running Simulation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Click the **Run Simulation** button to execute the simulation and view results.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Understanding the Results
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Performance Metrics
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- **Total Execution Time**: Overall time to complete the job
+- **Throughput**: Items processed per second
+- **Total Items Processed**: Total number of items
+- **Parallelization Efficiency**: How effectively parallel processing is utilized
 
-## Learn More
+### Timeline Visualization
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Shows a visual timeline of:
+- Step execution bars (blue)
+- Chunk processing bars (orange)
+- Time markers for reference
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Event Log
 
-### Code Splitting
+Detailed chronological log of all events including:
+- Job start/end
+- Partitioner creation
+- Step start/end
+- Chunk read/process/write operations
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Example Scenarios
 
-### Analyzing the Bundle Size
+### Scenario 1: Simple Job (No Partitioning)
+- Total Items: 1000
+- Chunk Size: 100
+- Parallel Processors: 1
+- Read Time: 1ms
+- Process Time: 2ms
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Scenario 2: Partitioned Job
+- Total Items: 10000
+- Enable Partitioner: Yes
+- Grid Size: 4
+- Parallel Partitions: 2
+- Chunk Size: 100
+- Parallel Processors: 2
+- Read Time: 1ms
+- Process Time: 2ms
 
-### Making a Progressive Web App
+## Technologies Used
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- React 19
+- CSS3 (Custom styling)
+- Create React App
 
-### Advanced Configuration
+## Project Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```
+src/
+├── components/
+│   ├── SpringBatchSimulator.js    # Core simulation engine
+│   ├── TimelineVisualization.js   # Timeline component
+│   ├── TimelineVisualization.css
+│   ├── PerformanceMetrics.js      # Metrics display
+│   └── PerformanceMetrics.css
+├── App.js                          # Main application component
+├── App.css                         # Main styles
+└── index.js                        # Entry point
+```
 
-### Deployment
+## License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+MIT
