@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/spring-batch-visualization-tool/static/css/main.fc33b7c9.css",
+    "main.js": "/spring-batch-visualization-tool/static/js/main.7b1f188a.js",
+    "static/js/453.d78a58e7.chunk.js": "/spring-batch-visualization-tool/static/js/453.d78a58e7.chunk.js",
+    "index.html": "/spring-batch-visualization-tool/index.html",
+    "main.fc33b7c9.css.map": "/spring-batch-visualization-tool/static/css/main.fc33b7c9.css.map",
+    "main.7b1f188a.js.map": "/spring-batch-visualization-tool/static/js/main.7b1f188a.js.map",
+    "453.d78a58e7.chunk.js.map": "/spring-batch-visualization-tool/static/js/453.d78a58e7.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.fc33b7c9.css",
+    "static/js/main.7b1f188a.js"
+  ]
+}
