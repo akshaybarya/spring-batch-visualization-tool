@@ -119,6 +119,51 @@ src/
 └── index.js                        # Entry point
 ```
 
+## Deployment to GitHub Pages
+
+This project is configured for easy deployment to GitHub Pages.
+
+### Prerequisites
+
+1. Create a GitHub repository named `spring-batch-visualization-tool`
+2. Push your code to the repository
+
+### Deploy Steps
+
+1. **Build and Deploy**:
+   ```bash
+   npm run deploy
+   ```
+
+   This command will:
+   - Build the production version of your app
+   - Create a `gh-pages` branch
+   - Deploy the build folder to GitHub Pages
+
+2. **Enable GitHub Pages** (First time only):
+   - Go to your repository on GitHub
+   - Navigate to Settings → Pages
+   - Source should be set to `gh-pages` branch (this is done automatically by the deploy script)
+   - Your site will be published at: `https://akshaybarya.github.io/spring-batch-visualization-tool`
+
+3. **Subsequent Deployments**:
+   ```bash
+   npm run deploy
+   ```
+   Just run this command whenever you want to update the live site.
+
+### Manual Deployment Steps
+
+If you prefer manual deployment:
+
+```bash
+# 1. Build the project
+npm run build
+
+# 2. Deploy to gh-pages branch
+npx gh-pages -d build
+```
+
 ## License
 
 MIT
