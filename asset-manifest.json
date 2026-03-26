@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/spring-batch-visualization-tool/static/css/main.3c91644f.css",
-    "main.js": "/spring-batch-visualization-tool/static/js/main.c69d251b.js",
+    "main.css": "/spring-batch-visualization-tool/static/css/main.87b911dd.css",
+    "main.js": "/spring-batch-visualization-tool/static/js/main.0a0e0d69.js",
     "static/js/453.d78a58e7.chunk.js": "/spring-batch-visualization-tool/static/js/453.d78a58e7.chunk.js",
     "index.html": "/spring-batch-visualization-tool/index.html",
-    "main.3c91644f.css.map": "/spring-batch-visualization-tool/static/css/main.3c91644f.css.map",
-    "main.c69d251b.js.map": "/spring-batch-visualization-tool/static/js/main.c69d251b.js.map",
+    "main.87b911dd.css.map": "/spring-batch-visualization-tool/static/css/main.87b911dd.css.map",
+    "main.0a0e0d69.js.map": "/spring-batch-visualization-tool/static/js/main.0a0e0d69.js.map",
     "453.d78a58e7.chunk.js.map": "/spring-batch-visualization-tool/static/js/453.d78a58e7.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.3c91644f.css",
-    "static/js/main.c69d251b.js"
+    "static/css/main.87b911dd.css",
+    "static/js/main.0a0e0d69.js"
   ]
 }
