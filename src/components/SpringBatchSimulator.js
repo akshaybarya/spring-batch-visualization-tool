@@ -5,12 +5,14 @@ export class SpringBatchSimulator {
     this.gridSize = config.gridSize;
     this.parallelPartitions = config.parallelPartitions;
     this.chunkSize = config.chunkSize;
-    this.parallelProcessors = config.parallelProcessors;
+    this.asyncPoolSize = config.asyncPoolSize || 10;
     this.readTime = config.readTime;
     this.processTime = config.processTime;
+    this.writeTime = config.writeTime || 1;
     this.enableResourceValidation = config.enableResourceValidation;
     this.podCores = config.podCores;
-    this.podThreads = config.podThreads;
+    this.ioThreads = config.ioThreads;
+    this.workerThreads = config.workerThreads;
     this.hikariPoolSize = config.hikariPoolSize;
     this.hikariMaxPoolSize = config.hikariMaxPoolSize;
   }
@@ -39,24 +41,71 @@ export class SpringBatchSimulator {
     const warnings = [];
     const suggestions = [];
     
-    const maxConcurrentThreads = this.usePartitioner 
-      ? this.parallelPartitions * this.parallelProcessors
-      : this.parallelProcessors;
+    // Partition workers = parallel partitions (each partition runs in its own thread)
+    const partitionWorkers = this.usePartitioner ? this.parallelPartitions : 1;
     
-    const maxConcurrentDbConnections = this.usePartitioner
-      ? this.parallelPartitions * this.parallelProcessors
-      : this.parallelProcessors;
+    // IO thread usage: Each partition worker uses IO threads for reading and writing
+    // Reader: synchronous, 1 thread per worker (reads chunk at a time)
+    // Writer: 1 thread per worker (writes entire chunk in one batch operation)
+    const ioThreadsForReading = partitionWorkers; // 1 reader thread per worker
+    const ioThreadsForWriting = partitionWorkers; // 1 writer thread per worker (batch write)
+    const totalIOThreadsUsed = ioThreadsForReading + ioThreadsForWriting;
     
-    if (maxConcurrentThreads > this.podThreads) {
+    // Worker thread usage: AsyncItemProcessor uses worker threads for CPU-bound processing
+    // Each item in a chunk can be processed in parallel using the async pool
+    const workerThreadsForProcessing = partitionWorkers * this.asyncPoolSize;
+    
+    // Total threads = partition workers + async threads (for processing and writing)
+    const maxConcurrentThreads = partitionWorkers + (partitionWorkers * this.asyncPoolSize);
+    
+    // DB connections needed = async threads (each async processor/writer may need a connection)
+    const maxConcurrentDbConnections = totalIOThreadsUsed;
+    
+    // Check IO thread usage
+    const ioThreadUtilization = (totalIOThreadsUsed / this.ioThreads) * 100;
+    if (totalIOThreadsUsed > this.ioThreads) {
       warnings.push({
-        type: 'thread_overflow',
-        severity: 'error',
-        message: `Configuration requires ${maxConcurrentThreads} threads but POD only has ${this.podThreads} threads available`,
-        impact: 'Job will be throttled and may fail due to thread exhaustion',
-        recommendation: `Reduce parallel partitions (${this.parallelPartitions}) or parallel processors (${this.parallelProcessors}), or increase POD threads to at least ${maxConcurrentThreads}`
+        type: 'io-threads',
+        severity: 'high',
+        message: `IO thread usage (${totalIOThreadsUsed}) exceeds available IO threads (${this.ioThreads})`,
+        impact: 'Reader/Writer operations will be blocked, causing severe slowdowns',
+        recommendation: `Reduce parallel workers to ${Math.floor(this.ioThreads / (this.asyncPoolSize + 1))} or reduce async pool size to ${Math.floor((this.ioThreads - partitionWorkers) / partitionWorkers)}`
       });
+    } else if (ioThreadUtilization > 90) {
+      warnings.push({
+        type: 'io-threads',
+        severity: 'medium',
+        message: `IO thread utilization is ${ioThreadUtilization.toFixed(1)}% (${totalIOThreadsUsed}/${this.ioThreads})`,
+        impact: 'IO operations may experience contention',
+        recommendation: `Consider increasing IO threads to ${totalIOThreadsUsed + 2} or reducing async pool size`
+      });
+    } else if (ioThreadUtilization < 30) {
+      suggestions.push(`IO threads are underutilized (${ioThreadUtilization.toFixed(1)}%). System can handle more parallel workers or larger async pool.`);
     }
     
+    // Check Worker thread usage
+    const workerThreadUtilization = (workerThreadsForProcessing / this.workerThreads) * 100;
+    if (workerThreadsForProcessing > this.workerThreads) {
+      warnings.push({
+        type: 'worker-threads',
+        severity: 'high',
+        message: `Worker thread usage (${workerThreadsForProcessing}) exceeds available worker threads (${this.workerThreads})`,
+        impact: 'Processing operations will be queued, causing severe performance degradation',
+        recommendation: `Reduce async pool size to ${Math.floor(this.workerThreads / partitionWorkers)} or reduce parallel workers`
+      });
+    } else if (workerThreadUtilization > 90) {
+      warnings.push({
+        type: 'worker-threads',
+        severity: 'medium',
+        message: `Worker thread utilization is ${workerThreadUtilization.toFixed(1)}% (${workerThreadsForProcessing}/${this.workerThreads})`,
+        impact: 'CPU-bound processing may experience contention',
+        recommendation: `Consider increasing worker threads to ${workerThreadsForProcessing + 4} or reducing async pool size`
+      });
+    } else if (workerThreadUtilization < 30) {
+      suggestions.push(`Worker threads are underutilized (${workerThreadUtilization.toFixed(1)}%). Can increase async pool size to ${Math.floor(this.workerThreads / partitionWorkers)} for better CPU utilization.`);
+    }
+    
+    // Check DB connections
     if (maxConcurrentDbConnections > this.hikariMaxPoolSize) {
       warnings.push({
         type: 'db_pool_overflow',
@@ -67,37 +116,10 @@ export class SpringBatchSimulator {
       });
     }
     
-    const threadUtilization = (maxConcurrentThreads / this.podThreads) * 100;
-    if (threadUtilization < 50) {
-      suggestions.push({
-        type: 'thread_underutilization',
-        severity: 'info',
-        message: `Thread utilization is only ${threadUtilization.toFixed(1)}% (${maxConcurrentThreads}/${this.podThreads} threads)`,
-        impact: 'Resources are underutilized, job could run faster',
-        recommendation: `Consider increasing parallel partitions or parallel processors to utilize more threads. You can safely use up to ${this.podThreads} threads.`
-      });
-    }
-    
+    // Check DB utilization
     const dbUtilization = (maxConcurrentDbConnections / this.hikariMaxPoolSize) * 100;
-    if (dbUtilization < 50 && maxConcurrentDbConnections < this.hikariMaxPoolSize) {
-      suggestions.push({
-        type: 'db_underutilization',
-        severity: 'info',
-        message: `DB connection utilization is only ${dbUtilization.toFixed(1)}% (${maxConcurrentDbConnections}/${this.hikariMaxPoolSize} connections)`,
-        impact: 'Database connection pool is underutilized',
-        recommendation: `You can increase parallelism to utilize more DB connections (up to ${this.hikariMaxPoolSize}) for better performance.`
-      });
-    }
-    
-    const coreUtilization = (maxConcurrentThreads / (this.podCores * 4)) * 100;
-    if (coreUtilization > 100) {
-      warnings.push({
-        type: 'cpu_oversubscription',
-        severity: 'warning',
-        message: `Thread count (${maxConcurrentThreads}) exceeds optimal CPU capacity (${this.podCores} cores × 4 = ${this.podCores * 4} threads)`,
-        impact: 'CPU oversubscription may lead to context switching overhead and reduced performance',
-        recommendation: `Consider reducing parallelism or increasing POD CPU cores. Optimal thread count for Spring Batch is typically 4× CPU cores.`
-      });
+    if (dbUtilization < 30 && maxConcurrentDbConnections < this.hikariMaxPoolSize) {
+      suggestions.push(`DB connections are underutilized (${dbUtilization.toFixed(1)}%). Can increase parallelism to utilize more connections (up to ${this.hikariMaxPoolSize}).`);
     }
     
     return {
@@ -105,20 +127,37 @@ export class SpringBatchSimulator {
       warnings,
       suggestions,
       resourceUsage: {
-        threads: {
+        ioThreads: {
+          required: totalIOThreadsUsed,
+          available: this.ioThreads,
+          utilization: ioThreadUtilization,
+          breakdown: {
+            reading: ioThreadsForReading,
+            writing: ioThreadsForWriting
+          }
+        },
+        workerThreads: {
+          required: workerThreadsForProcessing,
+          available: this.workerThreads,
+          utilization: workerThreadUtilization,
+          breakdown: {
+            processing: workerThreadsForProcessing
+          }
+        },
+        totalThreads: {
           required: maxConcurrentThreads,
-          available: this.podThreads,
-          utilization: threadUtilization
+          available: this.ioThreads + this.workerThreads,
+          utilization: (maxConcurrentThreads / (this.ioThreads + this.workerThreads)) * 100
         },
         dbConnections: {
-          required: maxConcurrentDbConnections,
+          required: totalIOThreadsUsed,
           available: this.hikariMaxPoolSize,
-          utilization: dbUtilization
+          utilization: (totalIOThreadsUsed / this.hikariMaxPoolSize) * 100
         },
         cpuCores: {
           available: this.podCores,
-          optimalThreads: this.podCores * 4,
-          utilization: coreUtilization
+          optimalIOThreads: this.podCores * 2,
+          optimalWorkerThreads: this.podCores * 4
         }
       }
     };
@@ -243,7 +282,7 @@ export class SpringBatchSimulator {
       type: 'step-start',
       time: startTime,
       stepName,
-      description: `${stepName} started with ${itemCount} items`
+      description: `${stepName} started with ${itemCount} items (Worker thread with sync reader, async processor/writer)`
     });
 
     const chunks = [];
@@ -262,83 +301,91 @@ export class SpringBatchSimulator {
       });
     }
 
+    // Process chunks sequentially (synchronous reader)
     const chunkResults = [];
     let currentTime = startTime;
-    let chunkIndex = 0;
-    const runningChunks = [];
 
-    while (chunkIndex < chunks.length || runningChunks.length > 0) {
-      while (runningChunks.length < this.parallelProcessors && chunkIndex < chunks.length) {
-        const chunk = chunks[chunkIndex];
-        const chunkStartTime = currentTime;
-        
-        const readTime = chunk.itemCount * this.readTime;
-        const processTime = chunk.itemCount * this.processTime;
-        const writeTime = 1;
-        const totalChunkTime = readTime + processTime + writeTime;
-        const chunkEndTime = chunkStartTime + totalChunkTime;
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+      const chunkStartTime = currentTime;
+      
+      // Synchronous read (thread-safe, sequential) - read time is per chunk, not per item
+      const readTime = this.readTime;
+      
+      timeline.push({
+        type: 'chunk-start',
+        time: chunkStartTime,
+        stepName,
+        chunkId: chunk.id,
+        description: `${stepName} - Chunk ${chunk.id} started (${chunk.itemCount} items)`
+      });
 
-        timeline.push({
-          type: 'chunk-start',
-          time: chunkStartTime,
-          stepName,
-          chunkId: chunk.id,
-          description: `${stepName} - Chunk ${chunk.id} started (${chunk.itemCount} items)`
+      timeline.push({
+        type: 'chunk-read',
+        time: chunkStartTime,
+        stepName,
+        chunkId: chunk.id,
+        duration: readTime,
+        description: `[SYNC] Reading ${chunk.itemCount} items sequentially (${readTime.toFixed(2)}ms)`
+      });
+
+      const readEndTime = chunkStartTime + readTime;
+      
+      // Async processing and writing (parallel execution with async pool)
+      const asyncItems = [];
+      const itemsPerAsyncTask = Math.ceil(chunk.itemCount / this.asyncPoolSize);
+      
+      for (let i = 0; i < chunk.itemCount; i += itemsPerAsyncTask) {
+        const asyncItemCount = Math.min(itemsPerAsyncTask, chunk.itemCount - i);
+        asyncItems.push({
+          id: Math.floor(i / itemsPerAsyncTask),
+          itemCount: asyncItemCount,
+          processTime: asyncItemCount * this.processTime,
+          writeTime: this.writeTime
         });
-
-        timeline.push({
-          type: 'chunk-read',
-          time: chunkStartTime,
-          stepName,
-          chunkId: chunk.id,
-          duration: readTime,
-          description: `Reading ${chunk.itemCount} items (${readTime.toFixed(2)}ms)`
-        });
-
-        timeline.push({
-          type: 'chunk-process',
-          time: chunkStartTime + readTime,
-          stepName,
-          chunkId: chunk.id,
-          duration: processTime,
-          description: `Processing ${chunk.itemCount} items (${processTime.toFixed(2)}ms)`
-        });
-
-        timeline.push({
-          type: 'chunk-write',
-          time: chunkStartTime + readTime + processTime,
-          stepName,
-          chunkId: chunk.id,
-          duration: writeTime,
-          description: `Writing chunk (${writeTime.toFixed(2)}ms)`
-        });
-
-        timeline.push({
-          type: 'chunk-end',
-          time: chunkEndTime,
-          stepName,
-          chunkId: chunk.id,
-          description: `${stepName} - Chunk ${chunk.id} completed`
-        });
-
-        runningChunks.push({
-          chunk,
-          startTime: chunkStartTime,
-          endTime: chunkEndTime
-        });
-
-        chunkIndex++;
       }
+      
+      // Async tasks run in parallel (limited by async pool size)
+      const maxAsyncTime = Math.max(...asyncItems.map(item => item.processTime + item.writeTime));
+      
+      timeline.push({
+        type: 'chunk-process',
+        time: readEndTime,
+        stepName,
+        chunkId: chunk.id,
+        duration: maxAsyncTime,
+        description: `[ASYNC] Processing ${chunk.itemCount} items with ${asyncItems.length} async tasks (pool size: ${this.asyncPoolSize}) (${maxAsyncTime.toFixed(2)}ms)`
+      });
 
-      if (runningChunks.length > 0) {
-        runningChunks.sort((a, b) => a.endTime - b.endTime);
-        const completed = runningChunks.shift();
-        chunkResults.push(completed);
-        currentTime = completed.endTime;
-      }
+      timeline.push({
+        type: 'chunk-write',
+        time: readEndTime,
+        stepName,
+        chunkId: chunk.id,
+        duration: maxAsyncTime,
+        description: `[ASYNC] Writing items in parallel (${maxAsyncTime.toFixed(2)}ms)`
+      });
+
+      const chunkEndTime = readEndTime + maxAsyncTime;
+      
+      timeline.push({
+        type: 'chunk-end',
+        time: chunkEndTime,
+        stepName,
+        chunkId: chunk.id,
+        description: `${stepName} - Chunk ${chunk.id} completed`
+      });
+
+      chunkResults.push({
+        chunk,
+        startTime: chunkStartTime,
+        endTime: chunkEndTime
+      });
+      
+      currentTime = chunkEndTime;
     }
 
-    const stepEndTime = Math.max(...chunkResults.map(c => c.endTime));
+    const stepEndTime = currentTime;
 
     timeline.push({
       type: 'step-end',

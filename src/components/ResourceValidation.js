@@ -68,18 +68,10 @@ const ResourceValidation = ({ validation }) => {
         <div className="validation-section">
           <h3>💡 Optimization Suggestions</h3>
           {suggestions.map((suggestion, idx) => (
-            <div key={idx} className={`validation-item ${getSeverityClass(suggestion.severity)}`}>
+            <div key={idx} className="validation-item severity-info">
               <div className="validation-header">
-                <span className="severity-icon">{getSeverityIcon(suggestion.severity)}</span>
-                <span className="validation-message">{suggestion.message}</span>
-              </div>
-              <div className="validation-details">
-                <div className="detail-row">
-                  <strong>Impact:</strong> {suggestion.impact}
-                </div>
-                <div className="detail-row recommendation">
-                  <strong>Recommendation:</strong> {suggestion.recommendation}
-                </div>
+                <span className="severity-icon">💡</span>
+                <span className="validation-message">{suggestion}</span>
               </div>
             </div>
           ))}
@@ -91,25 +83,37 @@ const ResourceValidation = ({ validation }) => {
         <div className="resource-grid">
           <div className="resource-card">
             <div className="resource-header">
-              <span className="resource-icon">🧵</span>
-              <span className="resource-title">Threads</span>
+              <span className="resource-icon">📥</span>
+              <span className="resource-title">IO Threads</span>
             </div>
             <div className="resource-stats">
               <div className="stat-row">
                 <span>Required:</span>
-                <span className="stat-value">{resourceUsage.threads.required}</span>
+                <span className="stat-value">{resourceUsage.ioThreads.required}</span>
               </div>
+              {resourceUsage.ioThreads.breakdown && (
+                <>
+                  <div className="stat-row" style={{ fontSize: '12px', color: '#6b7280', marginLeft: '10px' }}>
+                    <span>↳ Reading:</span>
+                    <span className="stat-value">{resourceUsage.ioThreads.breakdown.reading}</span>
+                  </div>
+                  <div className="stat-row" style={{ fontSize: '12px', color: '#6b7280', marginLeft: '10px' }}>
+                    <span>↳ Writing:</span>
+                    <span className="stat-value">{resourceUsage.ioThreads.breakdown.writing}</span>
+                  </div>
+                </>
+              )}
               <div className="stat-row">
                 <span>Available:</span>
-                <span className="stat-value">{resourceUsage.threads.available}</span>
+                <span className="stat-value">{resourceUsage.ioThreads.available}</span>
               </div>
               <div className="stat-row">
                 <span>Utilization:</span>
                 <span 
                   className="stat-value" 
-                  style={{ color: getUtilizationColor(resourceUsage.threads.utilization) }}
+                  style={{ color: getUtilizationColor(resourceUsage.ioThreads.utilization || 0) }}
                 >
-                  {resourceUsage.threads.utilization.toFixed(1)}%
+                  {(resourceUsage.ioThreads.utilization || 0).toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -117,8 +121,51 @@ const ResourceValidation = ({ validation }) => {
               <div 
                 className="progress-fill" 
                 style={{ 
-                  width: `${Math.min(resourceUsage.threads.utilization, 100)}%`,
-                  backgroundColor: getUtilizationColor(resourceUsage.threads.utilization)
+                  width: `${Math.min(resourceUsage.ioThreads.utilization || 0, 100)}%`,
+                  backgroundColor: getUtilizationColor(resourceUsage.ioThreads.utilization || 0)
+                }}
+              ></div>
+            </div>
+          </div>
+
+          <div className="resource-card">
+            <div className="resource-header">
+              <span className="resource-icon">⚙️</span>
+              <span className="resource-title">Worker Threads</span>
+            </div>
+            <div className="resource-stats">
+              <div className="stat-row">
+                <span>Required:</span>
+                <span className="stat-value">{resourceUsage.workerThreads.required}</span>
+              </div>
+              {resourceUsage.workerThreads.breakdown && (
+                <>
+                  <div className="stat-row" style={{ fontSize: '12px', color: '#6b7280', marginLeft: '10px' }}>
+                    <span>↳ Processing:</span>
+                    <span className="stat-value">{resourceUsage.workerThreads.breakdown.processing}</span>
+                  </div>
+                </>
+              )}
+              <div className="stat-row">
+                <span>Available:</span>
+                <span className="stat-value">{resourceUsage.workerThreads.available}</span>
+              </div>
+              <div className="stat-row">
+                <span>Utilization:</span>
+                <span 
+                  className="stat-value" 
+                  style={{ color: getUtilizationColor(resourceUsage.workerThreads.utilization || 0) }}
+                >
+                  {(resourceUsage.workerThreads.utilization || 0).toFixed(1)}%
+                </span>
+              </div>
+            </div>
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{ 
+                  width: `${Math.min(resourceUsage.workerThreads.utilization || 0, 100)}%`,
+                  backgroundColor: getUtilizationColor(resourceUsage.workerThreads.utilization || 0)
                 }}
               ></div>
             </div>
@@ -142,9 +189,9 @@ const ResourceValidation = ({ validation }) => {
                 <span>Utilization:</span>
                 <span 
                   className="stat-value" 
-                  style={{ color: getUtilizationColor(resourceUsage.dbConnections.utilization) }}
+                  style={{ color: getUtilizationColor(resourceUsage.dbConnections.utilization || 0) }}
                 >
-                  {resourceUsage.dbConnections.utilization.toFixed(1)}%
+                  {(resourceUsage.dbConnections.utilization || 0).toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -152,8 +199,8 @@ const ResourceValidation = ({ validation }) => {
               <div 
                 className="progress-fill" 
                 style={{ 
-                  width: `${Math.min(resourceUsage.dbConnections.utilization, 100)}%`,
-                  backgroundColor: getUtilizationColor(resourceUsage.dbConnections.utilization)
+                  width: `${Math.min(resourceUsage.dbConnections.utilization || 0, 100)}%`,
+                  backgroundColor: getUtilizationColor(resourceUsage.dbConnections.utilization || 0)
                 }}
               ></div>
             </div>
@@ -161,7 +208,7 @@ const ResourceValidation = ({ validation }) => {
 
           <div className="resource-card">
             <div className="resource-header">
-              <span className="resource-icon">⚙️</span>
+              <span className="resource-icon">🖥️</span>
               <span className="resource-title">CPU Cores</span>
             </div>
             <div className="resource-stats">
@@ -170,27 +217,13 @@ const ResourceValidation = ({ validation }) => {
                 <span className="stat-value">{resourceUsage.cpuCores.available}</span>
               </div>
               <div className="stat-row">
-                <span>Optimal Threads:</span>
-                <span className="stat-value">{resourceUsage.cpuCores.optimalThreads}</span>
+                <span>Optimal IO Threads:</span>
+                <span className="stat-value">{resourceUsage.cpuCores.optimalIOThreads}</span>
               </div>
               <div className="stat-row">
-                <span>CPU Load:</span>
-                <span 
-                  className="stat-value" 
-                  style={{ color: getUtilizationColor(resourceUsage.cpuCores.utilization) }}
-                >
-                  {resourceUsage.cpuCores.utilization.toFixed(1)}%
-                </span>
+                <span>Optimal Worker Threads:</span>
+                <span className="stat-value">{resourceUsage.cpuCores.optimalWorkerThreads}</span>
               </div>
-            </div>
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ 
-                  width: `${Math.min(resourceUsage.cpuCores.utilization, 100)}%`,
-                  backgroundColor: getUtilizationColor(resourceUsage.cpuCores.utilization)
-                }}
-              ></div>
             </div>
           </div>
         </div>
